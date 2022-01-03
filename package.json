@@ -1,0 +1,25 @@
+{
+    "name": "api-boilerplate",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "servers.js",
+    "license": "MIT",
+    "scripts": {
+        "server": "nodemon server",
+        "client": "npm start --prefix client",
+        "dev": "concurrently \"npm run server\" \"npm run client\""
+    },
+    "dependencies": {
+        "bcryptjs": "^2.4.3",
+        "cors": "^2.8.5",
+        "dotenv": "^10.0.0",
+        "express": "^4.17.2",
+        "jsonwebtoken": "^8.5.1",
+        "mongoose": "^6.1.4",
+        "multer": "^1.4.4"
+    },
+    "devDependencies": {
+        "concurrently": "^6.5.1",
+        "nodemon": "^2.0.15"
+    }
+}
