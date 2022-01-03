@@ -1,5 +1,7 @@
 import Team from '../models/team.model.js'
 import ErrorResponse from '../utils/ErrorResponse.util.js'
+import upload from '../utils/fileUpload.util.js'
+import { firstValues } from 'formidable/src/helpers/firstValues.js'
 
 export const getSingleTeam = async (req, res, next) => {
     try {
@@ -31,61 +33,64 @@ export const getAllTeams = async (req, res, next) => {
 
 export const createTeam = async (req, res, next) => {
     try {
-        let team
+        upload.parse(req, async (err, fields, files) => {
+            if (err) {
+                next(err)
+                return
+            }
 
-        if (req.file) {
-            const { title, description, users } = req.body
-            const { originalname, path, mimetype, size } = req.file
+            const exceptions = ['users']
+            const singleFields = firstValues(upload, fields, exceptions)
 
-            team = {
+            const { title, description, users } = singleFields
+
+            const team = await Team.create({
                 title,
                 description,
                 users,
                 teamImage: {
-                    fileName: originalname,
-                    filePath: path,
-                    fileType: mimetype,
-                    fileSize: size,
+                    fileName: files?.teamImage?.[0]?.newFilename,
+                    filePath: files?.teamImage?.[0]?.filepath,
+                    fileType: files?.teamImage?.[0]?.mimetype,
+                    fileSize: files?.teamImage?.[0]?.size,
                 },
-            }
-        }
+            })
 
-        !req.file ? (team = await Team.create(req.body)) : (team = await Team.create(team))
-
-        res.json({ success: true, data: team })
+            res.status(201).json(team)
+        })
     } catch (err) {
         next(err)
     }
 }
 
 export const updateTeam = async (req, res, next) => {
-    let updatedTeam
-
-    if (req.file) {
-        const { title, description, users } = req.body
-        const { originalname, path, mimetype, size } = req.file
-
-        updatedTeam = {
-            title,
-            description,
-            users,
-            teamImage: {
-                fileName: originalname,
-                filePath: path,
-                fileType: mimetype,
-                fileSize: size,
-            },
-        }
-    }
-
     try {
-        const team = await Team.findOneAndUpdate({ _id: req.params.id }, !req.file ? req.body : updatedTeam, {
-            new: true,
+        upload.parse(req, async (err, fields, files) => {
+            if (err) {
+                next(err)
+                return
+            }
+            const exceptions = ['users']
+            const singleFields = firstValues(upload, fields, exceptions)
+
+            const update = files?.teamImage?.[0]
+                ? {
+                      ...singleFields,
+                      teamImage: {
+                          fileName: files.teamImage[0].newFilename,
+                          filePath: files.teamImage[0].filepath,
+                          fileType: files.teamImage[0].mimetype,
+                          fileSize: files.teamImage[0].size,
+                      },
+                  }
+                : singleFields
+
+            const team = await Team.findOneAndUpdate({ _id: req.params.id }, update, { new: true })
+
+            await team.save()
+
+            res.status(200).json(team)
         })
-
-        await team.save()
-
-        res.status(200).json(team)
     } catch (err) {
         next(err)
     }

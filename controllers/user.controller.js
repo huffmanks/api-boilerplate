@@ -1,9 +1,11 @@
 import User from '../models/user.model.js'
 import ErrorResponse from '../utils/ErrorResponse.util.js'
+import upload from '../utils/fileUpload.util.js'
+import { firstValues } from 'formidable/src/helpers/firstValues.js'
 
 export const getSingleUser = async (req, res, next) => {
     try {
-        const user = await User.findById({ _id: req.params.id }).populate('team', 'title').populate('roles')
+        const user = await User.findById({ _id: req.params.id }).populate('team', 'title')
 
         if (!user) {
             return next(new ErrorResponse('No user can be found with that ID.', 404))
@@ -17,7 +19,7 @@ export const getSingleUser = async (req, res, next) => {
 
 export const getAllUsers = async (req, res, next) => {
     try {
-        const users = await User.find({}).populate('team', 'title').populate('roles')
+        const users = await User.find({}).populate('team', 'title')
 
         if (!users) {
             return next(new ErrorResponse('No users can be found.', 404))
@@ -31,31 +33,33 @@ export const getAllUsers = async (req, res, next) => {
 
 export const createUser = async (req, res, next) => {
     try {
-        let user
+        upload.parse(req, async (err, fields, files) => {
+            if (err) {
+                next(err)
+                return
+            }
 
-        if (req.file) {
-            const { firstName, lastName, email, password, team, roles } = req.body
-            const { originalname, path, mimetype, size } = req.file
+            const exceptions = ['']
+            const singleFields = firstValues(upload, fields, exceptions)
 
-            user = {
+            const { firstName, lastName, email, password, team } = singleFields
+
+            const user = await User.create({
                 firstName,
                 lastName,
                 email,
                 password,
                 profileImage: {
-                    fileName: originalname,
-                    filePath: path,
-                    fileType: mimetype,
-                    fileSize: size,
+                    fileName: files?.profileImage?.[0]?.newFilename,
+                    filePath: files?.profileImage?.[0]?.filepath,
+                    fileType: files?.profileImage?.[0]?.mimetype,
+                    fileSize: files?.profileImage?.[0]?.size,
                 },
                 team,
-                roles,
-            }
-        }
+            })
 
-        !req.file ? (user = await User.create(req.body)) : (user = await User.create(user))
-
-        res.json({ success: true, data: user })
+            res.status(201).json(user)
+        })
     } catch (err) {
         next(err)
     }
@@ -63,35 +67,32 @@ export const createUser = async (req, res, next) => {
 
 export const updateUser = async (req, res, next) => {
     try {
-        let updatedUser
-
-        if (req.file) {
-            const { firstName, lastName, email, password, team, roles } = req.body
-            const { originalname, path, mimetype, size } = req.file
-
-            updatedUser = {
-                firstName,
-                lastName,
-                email,
-                password,
-                profileImage: {
-                    fileName: originalname,
-                    filePath: path,
-                    fileType: mimetype,
-                    fileSize: size,
-                },
-                team,
-                roles,
+        upload.parse(req, async (err, fields, files) => {
+            if (err) {
+                next(err)
+                return
             }
-        }
+            const exceptions = ['']
+            const singleFields = firstValues(upload, fields, exceptions)
 
-        const user = await User.findOneAndUpdate({ _id: req.params.id }, !req.file ? req.body : updatedUser, {
-            new: true,
+            const update = files?.profileImage?.[0]
+                ? {
+                      ...singleFields,
+                      profileImage: {
+                          fileName: files.profileImage[0].newFilename,
+                          filePath: files.profileImage[0].filepath,
+                          fileType: files.profileImage[0].mimetype,
+                          fileSize: files.profileImage[0].size,
+                      },
+                  }
+                : singleFields
+
+            const user = await User.findOneAndUpdate({ _id: req.params.id }, update, { new: true })
+
+            await user.save()
+
+            res.status(200).json(user)
         })
-
-        await user.save()
-
-        res.status(200).json(user)
     } catch (err) {
         next(err)
     }

@@ -9,7 +9,6 @@ const TeamSchema = new Schema(
         },
         description: {
             type: String,
-            default: undefined,
         },
         users: [
             {
@@ -20,19 +19,15 @@ const TeamSchema = new Schema(
         teamImage: {
             fileName: {
                 type: String,
-                default: undefined,
             },
             filePath: {
                 type: String,
-                default: undefined,
             },
             fileType: {
                 type: String,
-                default: undefined,
             },
             fileSize: {
                 type: String,
-                default: undefined,
             },
         },
     },

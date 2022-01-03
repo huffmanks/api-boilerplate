@@ -32,38 +32,20 @@ const UserSchema = new Schema(
         profileImage: {
             fileName: {
                 type: String,
-                default: undefined,
             },
             filePath: {
                 type: String,
-                default: undefined,
             },
             fileType: {
                 type: String,
-                default: undefined,
             },
             fileSize: {
                 type: String,
-                default: undefined,
             },
         },
         team: {
             type: Schema.Types.ObjectId,
             ref: 'Team',
-        },
-        roles: {
-            isAdmin: {
-                type: Boolean,
-                default: false,
-            },
-            isEditor: {
-                type: Boolean,
-                default: false,
-            },
-            isAuthor: {
-                type: Boolean,
-                default: false,
-            },
         },
         resetPasswordToken: String,
         resetPasswordExpire: Date,
