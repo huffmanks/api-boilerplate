@@ -6,6 +6,7 @@ const TeamSchema = new Schema(
         title: {
             type: String,
             required: [true, 'Please provide the name of the team.'],
+            unique: true,
         },
         description: {
             type: String,

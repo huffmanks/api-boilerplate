@@ -5,29 +5,21 @@ import { firstValues } from 'formidable/src/helpers/firstValues.js'
 
 export const getSingleUser = async (req, res, next) => {
     try {
-        const user = await User.findById({ _id: req.params.id }).populate('team', 'title')
-
-        if (!user) {
-            return next(new ErrorResponse('No user can be found with that ID.', 404))
-        }
+        const user = await User.findById({ _id: req.params.id }).populate('team', 'title').populate('role', 'title')
 
         res.json(user)
     } catch (err) {
-        next(err)
+        return next(new ErrorResponse(`No user can be found with that ID.\n ${err.message}`, 404))
     }
 }
 
 export const getAllUsers = async (req, res, next) => {
     try {
-        const users = await User.find({}).populate('team', 'title')
-
-        if (!users) {
-            return next(new ErrorResponse('No users can be found.', 404))
-        }
+        const users = await User.find({}).populate('team', 'title').populate('role', 'title')
 
         res.json(users)
     } catch (err) {
-        next(err)
+        return next(new ErrorResponse(`No users can be found.\n ${err.message}`, 404))
     }
 }
 

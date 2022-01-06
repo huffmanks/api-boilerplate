@@ -21,7 +21,8 @@ const UserSchema = new Schema(
             type: String,
             required: [true, 'Please provide your email address.'],
             unique: true,
-            match: [/^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/, 'Please provide a valid email'],
+            match: [/^\S+@\S+\.\S{2,}$/, 'Please provide a valid email'],
+            lowercase: true,
         },
         password: {
             type: String,
@@ -42,6 +43,10 @@ const UserSchema = new Schema(
             fileSize: {
                 type: String,
             },
+        },
+        role: {
+            type: Schema.Types.ObjectId,
+            ref: 'Role',
         },
         team: {
             type: Schema.Types.ObjectId,

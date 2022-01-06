@@ -5,29 +5,21 @@ import { firstValues } from 'formidable/src/helpers/firstValues.js'
 
 export const getSingleTeam = async (req, res, next) => {
     try {
-        const team = await Team.findById({ _id: req.params.id })
-
-        if (!team) {
-            return next(new ErrorResponse('No team can be found with that ID.', 404))
-        }
+        const team = await Team.findById({ _id: req.params.id }).populate('users', 'firstName userName profileImage')
 
         res.json(team)
     } catch (err) {
-        next(err)
+        return next(new ErrorResponse(`No team can be found with that ID.\n ${err.message}`, 404))
     }
 }
 
 export const getAllTeams = async (req, res, next) => {
     try {
-        const teams = await Team.find({}).populate('users', 'userName')
-
-        if (!teams) {
-            return next(new ErrorResponse('No teams can be found.', 404))
-        }
+        const teams = await Team.find({}).populate('users', 'firstName userName profileImage')
 
         res.json(teams)
     } catch (err) {
-        next(err)
+        return next(new ErrorResponse(`No teams can be found.\n ${err.message}`, 404))
     }
 }
 
@@ -59,7 +51,7 @@ export const createTeam = async (req, res, next) => {
             res.status(201).json(team)
         })
     } catch (err) {
-        next(err)
+        return next(err)
     }
 }
 

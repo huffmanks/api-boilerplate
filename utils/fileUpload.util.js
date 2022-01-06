@@ -3,6 +3,7 @@ import path from 'path'
 
 const options = {
     keepExtensions: true,
+    multiples: true,
 }
 
 const upload = formidable(options)
