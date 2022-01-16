@@ -12,6 +12,7 @@ node_modules
 
 # misc
 config.env
+todo.md
 .DS_Store
 .env.local
 .env.development.local
