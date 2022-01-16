@@ -61,7 +61,7 @@ export const createUser = async (req, res, next) => {
             })
 
             if (team) {
-                const addUserToTeam = await Team.findOneAndUpdate({ _id: team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
+                const addUserToTeam = await Team.findByIdAndUpdate({ _id: team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
 
                 await addUserToTeam.save()
             }
@@ -107,7 +107,7 @@ export const updateUser = async (req, res, next) => {
                   }
                 : singleFields
 
-            const user = await User.findOneAndUpdate({ _id: req.params.id }, update, { new: true })
+            const user = await User.findByIdAndUpdate({ _id: req.params.id }, update, { new: true })
 
             await user.save()
 
@@ -128,6 +128,7 @@ export const updateUser = async (req, res, next) => {
         next(err)
     }
 }
+findByIdAndDele
 
 export const deleteUser = async (req, res, next) => {
     try {

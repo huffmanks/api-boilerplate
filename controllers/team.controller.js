@@ -113,7 +113,7 @@ export const updateTeam = async (req, res, next) => {
                   }
                 : singleFields
 
-            const team = await Team.findOneAndUpdate({ _id: req.params.id }, update, { new: true })
+            const team = await Team.findByIdAndUpdate({ _id: req.params.id }, update, { new: true })
 
             await team.save()
 
