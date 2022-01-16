@@ -1,10 +1,7 @@
-[Multer util](./utils/fileStorage.util.js)
+# server
 
--   Format file size output (i.e., '111KB', instead of '111000')
+## update user, team and role controllers
 
----
-
-[Error Response util](./utils/ErrorResponse.util.js) + (./middleware) + (./controllers)
-
--   Refactor error util and messages
--   Setup validation
+1. When creating/updating team [team](./controllers/team.controller.js)
+    <!-- - {{ UPDATE }} Remove team ID from user, if team is updated and removes the user -->
+    - Validate if user exists

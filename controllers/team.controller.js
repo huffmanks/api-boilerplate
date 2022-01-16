@@ -1,4 +1,5 @@
 import Team from '../models/team.model.js'
+import User from '../models/user.model.js'
 import ErrorResponse from '../utils/ErrorResponse.util.js'
 import upload from '../utils/fileUpload.util.js'
 import { firstValues } from 'formidable/src/helpers/firstValues.js'
@@ -36,6 +37,20 @@ export const createTeam = async (req, res, next) => {
 
             const { title, description, users } = singleFields
 
+            if (users) {
+                const usersList = await User.find({ _id: { $in: users } })
+
+                const usersID = usersList.map((ul) => ul._id.toString())
+
+                const matchedUsers = users.every((uid) => {
+                    return usersID.includes(uid)
+                })
+
+                if (!matchedUsers) {
+                    return next(new ErrorResponse('One or more users can not be found with the ID(s).', 404))
+                }
+            }
+
             const team = await Team.create({
                 title,
                 description,
@@ -48,6 +63,10 @@ export const createTeam = async (req, res, next) => {
                 },
             })
 
+            if (users) {
+                await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } })
+            }
+
             res.status(201).json(team)
         })
     } catch (err) {
@@ -57,6 +76,8 @@ export const createTeam = async (req, res, next) => {
 
 export const updateTeam = async (req, res, next) => {
     try {
+        const prevUsers = await User.find({ team: req.params.id }).select('team')
+
         upload.parse(req, async (err, fields, files) => {
             if (err) {
                 next(err)
@@ -64,6 +85,21 @@ export const updateTeam = async (req, res, next) => {
             }
             const exceptions = ['users']
             const singleFields = firstValues(upload, fields, exceptions)
+
+            if (singleFields.users) {
+                const { users } = singleFields
+                const usersList = await User.find({ _id: { $in: users } })
+
+                const usersID = usersList.map((ul) => ul._id.toString())
+
+                const matchedUsers = users.every((uid) => {
+                    return usersID.includes(uid)
+                })
+
+                if (!matchedUsers) {
+                    return next(new ErrorResponse('One or more users can not be found with the ID(s).', 404))
+                }
+            }
 
             const update = files?.teamImage?.[0]
                 ? {
@@ -81,6 +117,20 @@ export const updateTeam = async (req, res, next) => {
 
             await team.save()
 
+            if (prevUsers.length > 0) {
+                const prevUserIDs = prevUsers.map((user) => user._id.toString())
+
+                const removedUsers = prevUserIDs.filter((id) => !singleFields.users.includes(id))
+
+                await User.updateMany({ _id: { $in: removedUsers } }, { $unset: { team: null } }, { new: true })
+            }
+
+            if (singleFields.users) {
+                const { users } = singleFields
+
+                await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } }, { new: true })
+            }
+
             res.status(200).json(team)
         })
     } catch (err) {
@@ -90,9 +140,13 @@ export const updateTeam = async (req, res, next) => {
 
 export const deleteTeam = async (req, res, next) => {
     try {
-        Team.findOneAndDelete({ _id: req.params.id }, (err, doc) => {
+        Team.findOneAndDelete({ _id: req.params.id }, async (err, doc) => {
             if (err) {
                 return next(new ErrorResponse('No team can be found with that ID.', 404))
+            }
+
+            if (doc.users) {
+                User.updateMany({ _id: { $in: doc.users } }, { $unset: { team: undefined } }, { new: true })
             }
 
             res.status(200).json(doc)

@@ -10,7 +10,6 @@ import { errorHandler } from './middleware/error.middleware.js'
 
 import authRoutes from './routes/auth.routes.js'
 import userRoutes from './routes/user.routes.js'
-import roleRoutes from './routes/role.routes.js'
 import teamRoutes from './routes/team.routes.js'
 
 // Server Init
@@ -28,7 +27,6 @@ app.use(express.static('uploads'))
 // Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/private', userRoutes)
-app.use('/api/private', roleRoutes)
 app.use('/api/private', teamRoutes)
 
 // Server Start
