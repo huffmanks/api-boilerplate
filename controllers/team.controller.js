@@ -1,6 +1,5 @@
 import Team from '../models/team.model.js'
 import User from '../models/user.model.js'
-import ErrorResponse from '../utils/ErrorResponse.util.js'
 import upload from '../utils/fileUpload.util.js'
 import { firstValues } from 'formidable/src/helpers/firstValues.js'
 
@@ -10,7 +9,7 @@ export const getSingleTeam = async (req, res, next) => {
 
         res.json(team)
     } catch (err) {
-        return next(new ErrorResponse(`No team can be found with that ID.\n ${err.message}`, 404))
+        return next(res.status(404).json(`No team can be found with that ID.\n ${err.message}`))
     }
 }
 
@@ -20,7 +19,7 @@ export const getAllTeams = async (req, res, next) => {
 
         res.json(teams)
     } catch (err) {
-        return next(new ErrorResponse(`No teams can be found.\n ${err.message}`, 404))
+        return next(res.status(404).json(`No teams can be found.\n ${err.message}`))
     }
 }
 
@@ -47,7 +46,7 @@ export const createTeam = async (req, res, next) => {
                 })
 
                 if (!matchedUsers) {
-                    return next(new ErrorResponse('One or more users can not be found with the ID(s).', 404))
+                    return next(res.status(404).json('One or more users can not be found with the ID(s).'))
                 }
             }
 
@@ -97,7 +96,7 @@ export const updateTeam = async (req, res, next) => {
                 })
 
                 if (!matchedUsers) {
-                    return next(new ErrorResponse('One or more users can not be found with the ID(s).', 404))
+                    return next(res.status(404).json('One or more users can not be found with the ID(s).'))
                 }
             }
 
@@ -142,7 +141,7 @@ export const deleteTeam = async (req, res, next) => {
     try {
         Team.findOneAndDelete({ _id: req.params.id }, async (err, doc) => {
             if (err) {
-                return next(new ErrorResponse('No team can be found with that ID.', 404))
+                return next(res.status(404).json('No team can be found with that ID.'))
             }
 
             if (doc.users) {

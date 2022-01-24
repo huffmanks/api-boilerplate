@@ -11,8 +11,8 @@ node_modules
 /uploads
 
 # misc
+/todo.md
 config.env
-todo.md
 .DS_Store
 .env.local
 .env.development.local

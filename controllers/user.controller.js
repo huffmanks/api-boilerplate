@@ -1,6 +1,5 @@
 import User from '../models/user.model.js'
 import Team from '../models/team.model.js'
-import ErrorResponse from '../utils/ErrorResponse.util.js'
 import upload from '../utils/fileUpload.util.js'
 import { firstValues } from 'formidable/src/helpers/firstValues.js'
 
@@ -10,7 +9,7 @@ export const getSingleUser = async (req, res, next) => {
 
         res.json(user)
     } catch (err) {
-        return next(new ErrorResponse(`No user can be found with that ID.\n ${err.message}`, 404))
+        return next(res.status(404).json(`No user can be found with that ID.\n ${err.message}`))
     }
 }
 
@@ -20,7 +19,7 @@ export const getAllUsers = async (req, res, next) => {
 
         res.json(users)
     } catch (err) {
-        return next(new ErrorResponse(`No users can be found.\n ${err.message}`, 404))
+        return next(res.status(404).json(`No users can be found.\n ${err.message}`))
     }
 }
 
@@ -41,7 +40,7 @@ export const createUser = async (req, res, next) => {
                 const teamExists = await Team.findById(team)
 
                 if (teamExists === null) {
-                    return next(new ErrorResponse('No team can be found with that ID.', 404))
+                    return next(res.status(404).json('No team can be found with that ID.'))
                 }
             }
 
@@ -91,7 +90,7 @@ export const updateUser = async (req, res, next) => {
                 const teamExists = await Team.findById(team)
 
                 if (teamExists === null) {
-                    return next(new ErrorResponse('No team can be found with that ID.', 404))
+                    return next(res.status(404).json('No team can be found with that ID.'))
                 }
             }
 
@@ -128,13 +127,12 @@ export const updateUser = async (req, res, next) => {
         next(err)
     }
 }
-findByIdAndDele
 
 export const deleteUser = async (req, res, next) => {
     try {
         User.findOneAndDelete({ _id: req.params.id }, async (err, doc) => {
             if (err) {
-                return next(new ErrorResponse('No user can be found with that ID.', 404))
+                return next(res.status(404).json('No user can be found with that ID.'))
             }
 
             if (doc.team) {

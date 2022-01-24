@@ -1,28 +1,27 @@
 import crypto from 'crypto'
 import User from '../models/user.model.js'
 import sendToken from '../utils/sendToken.util.js'
-import ErrorResponse from '../utils/ErrorResponse.util.js'
 
 export const login = async (req, res, next) => {
     const { email, password } = req.body
 
     if (!email || !password) {
-        return next(new ErrorResponse('Please provide an email and password', 400))
+        return next(res.status(400).json('Please provide an email and password.'))
     }
     try {
         const user = await User.findOne({ email }).select('+password')
 
         if (!user) {
-            return next(new ErrorResponse('Invalid credentials.', 401))
+            return next(res.status(401).json('Invalid credentials.'))
         }
 
         const isMatch = await user.matchPassword(password)
 
         if (!isMatch) {
-            return next(new ErrorResponse('Invalid credentials', 401))
+            return next(res.status(401).json('Invalid credentials.'))
         }
 
-        sendToken(user, 200, res)
+        sendToken(res, 200, user, 'Logged in successfully.')
     } catch (err) {
         next(err)
     }
@@ -31,13 +30,25 @@ export const login = async (req, res, next) => {
 export const register = async (req, res, next) => {
     const { email, password } = req.body
 
+    if (!email) {
+        return next(res.status(400).json('Please provide an email.'))
+    }
+
+    if (!password) {
+        return next(res.status(400).json('Please provide a password.'))
+    }
+
+    if (!email && !password) {
+        return next(res.status(400).json('Please provide an email and password.'))
+    }
+
     try {
         const user = await User.create({
             email,
             password,
         })
 
-        sendToken(user, 201, res)
+        sendToken(res, 201, user, 'Account registered successfully.')
     } catch (err) {
         next(err)
     }
@@ -46,11 +57,15 @@ export const register = async (req, res, next) => {
 export const forgotPassword = async (req, res, next) => {
     const { email } = req.body
 
+    if (!email) {
+        return next(res.status(404).json('Please provide an email.'))
+    }
+
     try {
         const user = await User.findOne({ email })
 
         if (!user) {
-            return next(new ErrorResponse('No email could not be sent', 404))
+            return next(res.status(404).json('No account found with that email.'))
         }
 
         const resetToken = user.getResetPasswordToken()
@@ -58,16 +73,13 @@ export const forgotPassword = async (req, res, next) => {
         await user.save()
 
         try {
-            res.status(200).json({ success: true, data: resetToken })
+            res.status(200).json({ data: resetToken })
         } catch (err) {
-            console.log(err)
-
             user.resetPasswordToken = undefined
             user.resetPasswordExpire = undefined
 
             await user.save()
-
-            return next(new ErrorResponse('Email could not be sent', 500))
+            return next(res.status(500).json('Email could not be sent.'))
         }
     } catch (err) {
         next(err)
@@ -84,7 +96,7 @@ export const resetPassword = async (req, res, next) => {
         })
 
         if (!user) {
-            return next(new ErrorResponse('Invalid Token', 400))
+            return next(res.status(400).json('Invalid Token!'))
         }
 
         user.password = req.body.password
@@ -93,11 +105,7 @@ export const resetPassword = async (req, res, next) => {
 
         await user.save()
 
-        res.status(201).json({
-            success: true,
-            data: 'Password Updated Success',
-            token: user.getSignedToken(),
-        })
+        sendToken(res, 201, user, 'Password updated successfully.')
     } catch (err) {
         next(err)
     }
