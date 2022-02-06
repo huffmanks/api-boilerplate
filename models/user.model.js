@@ -53,6 +53,7 @@ const UserSchema = new Schema(
             type: Schema.Types.ObjectId,
             ref: 'Team',
         },
+        refreshToken: String,
         resetPasswordToken: String,
         resetPasswordExpire: Date,
     },
@@ -64,7 +65,8 @@ const UserSchema = new Schema(
 UserSchema.pre('save', async function (next) {
     const username = this.email.substring(0, this.email.indexOf('@'))
     this.userName = username
-    next()
+
+    return next()
 })
 
 UserSchema.pre('save', async function (next) {
@@ -74,27 +76,36 @@ UserSchema.pre('save', async function (next) {
 
     const salt = await bcrypt.genSalt(10)
     this.password = await bcrypt.hash(this.password, salt)
-    next()
+
+    return next()
 })
 
 UserSchema.methods.matchPassword = async function (password) {
     return await bcrypt.compare(password, this.password)
 }
 
-UserSchema.methods.getSignedToken = function () {
-    return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
-        expiresIn: process.env.JWT_EXPIRE,
-    })
+UserSchema.methods.getSignedToken = function (secret, expiresIn) {
+    return jwt.sign(
+        {
+            user: {
+                email: this.email,
+                role: this.role,
+            },
+        },
+        secret,
+        {
+            expiresIn,
+        }
+    )
 }
 
 UserSchema.methods.getResetPasswordToken = function () {
-    const resetToken = crypto.randomBytes(20).toString('hex')
+    const resetPasswordToken = crypto.randomBytes(20).toString('hex')
 
-    this.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex')
+    this.resetPasswordToken = crypto.createHash('sha256').update(resetPasswordToken).digest('hex')
+    this.resetPasswordExpire = Date.now() + 5 * (60 * 1000)
 
-    this.resetPasswordExpire = Date.now() + 10 * (60 * 1000)
-
-    return resetToken
+    return resetPasswordToken
 }
 
 const User = mongoose.model('User', UserSchema)

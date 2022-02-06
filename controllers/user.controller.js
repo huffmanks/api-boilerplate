@@ -1,7 +1,7 @@
-import User from '../models/user.model.js'
-import Team from '../models/team.model.js'
-import upload from '../utils/fileUpload.util.js'
+import bcrypt from 'bcryptjs'
+import { User, Team } from '../models/index.js'
 import { firstValues } from 'formidable/src/helpers/firstValues.js'
+import upload from '../utils/fileUpload.util.js'
 
 export const getSingleUser = async (req, res, next) => {
     try {
@@ -92,6 +92,16 @@ export const updateUser = async (req, res, next) => {
                 if (teamExists === null) {
                     return next(res.status(404).json('No team can be found with that ID.'))
                 }
+            }
+
+            if (singleFields.email) {
+                const username = singleFields.email.substring(0, singleFields.email.indexOf('@'))
+                singleFields.userName = username
+            }
+
+            if (singleFields.password) {
+                const salt = await bcrypt.genSalt(10)
+                singleFields.password = await bcrypt.hash(singleFields.password, salt)
             }
 
             const update = files?.profileImage?.[0]

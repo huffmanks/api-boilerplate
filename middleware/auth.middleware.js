@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken'
-import User from '../models/user.model.js'
-import ErrorResponse from '../utils/ErrorResponse.util.js'
+import { User } from '../models/index.js'
+import { ErrorResponse } from '../utils/index.js'
 
 export const protect = async (req, res, next) => {
     let token
@@ -14,7 +14,7 @@ export const protect = async (req, res, next) => {
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET)
+        const decoded = jwt.verify(token, process.env.JWT_REFRESH_TOKEN_SECRET)
 
         const user = await User.findById(decoded.id)
 

@@ -1,7 +1,6 @@
-import Team from '../models/team.model.js'
-import User from '../models/user.model.js'
-import upload from '../utils/fileUpload.util.js'
+import { User, Team } from '../models/index.js'
 import { firstValues } from 'formidable/src/helpers/firstValues.js'
+import upload from '../utils/fileUpload.util.js'
 
 export const getSingleTeam = async (req, res, next) => {
     try {
