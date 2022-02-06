@@ -1,4 +1,4 @@
-const sendToken = (res, statusCode, user, refreshToken, accessToken, message) => {
+export const sendToken = (res, statusCode, user, refreshToken, accessToken, message) => {
     return res
         .cookie('refreshToken', refreshToken, { httpOnly: true })
         .status(statusCode)
@@ -11,5 +11,3 @@ const sendToken = (res, statusCode, user, refreshToken, accessToken, message) =>
             message,
         })
 }
-
-export default sendToken

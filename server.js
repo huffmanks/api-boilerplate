@@ -25,7 +25,6 @@ app.use(express.json())
 
 app.use(cors())
 app.use(cookieParser())
-app.use(errorHandler)
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 
@@ -33,6 +32,8 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
 app.use('/api/auth', authRoutes)
 app.use('/api/private', userRoutes)
 app.use('/api/private', teamRoutes)
+
+app.use(errorHandler)
 
 // Server Start
 const PORT = process.env.PORT || 5000

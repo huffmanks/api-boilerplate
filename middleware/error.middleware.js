@@ -1,22 +1,21 @@
-import { ErrorResponse } from '../utils/index.js'
+import { errorResponse } from '../utils/index.js'
 
 export const errorHandler = (err, req, res, next) => {
-    let error = { ...err }
-
-    error.message = err.message
+    const error = !err.errors ? err : Object.values(err.errors).map((field) => field)
 
     if (err.code === 11000) {
-        const message = `Duplicate Field value entered`
-        error = new ErrorResponse(message, 400)
+        const { name, keyValue } = error
+
+        for (const [field, value] of Object.entries(keyValue)) {
+            return errorResponse(res, 400, { name, message: `A record with the ${field}, ${value}, already exists.` })
+        }
     }
 
     if (err.name === 'ValidationError') {
-        const message = Object.values(err.errors).map((val) => val.message)
-        error = new ErrorResponse(message, 400)
+        const { name, value, path } = error[0]
+
+        return errorResponse(res, 400, { name, message: `The ${path}, ${value}, is not valid.` })
     }
 
-    res.status(error.statusCode || 500).json({
-        success: false,
-        error: error.message || 'Server Error',
-    })
+    return errorResponse(res, 500, { name: err.name, code: err.code, message: err.message })
 }
