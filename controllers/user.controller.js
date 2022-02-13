@@ -76,60 +76,119 @@ export const updateUser = async (req, res, next) => {
     try {
         const prevTeam = await User.findById({ _id: req.params.id }).select('team')
 
+        let userName
+
+        const { email, password, team } = req.body
+
+        if (team) {
+            const teamExists = await Team.findById(team)
+
+            if (teamExists === null) {
+                return next(res.status(404).json('No team can be found with that ID.'))
+            }
+        }
+
+        if (email) {
+            const username = email.substring(0, email.indexOf('@'))
+            userName = username
+        }
+
+        if (password) {
+            const salt = await bcrypt.genSalt(10)
+            password = await bcrypt.hash(password, salt)
+        }
+
         upload.parse(req, async (err, fields, files) => {
             if (err) {
                 next(err)
                 return
             }
 
-            const exceptions = ['']
-            const singleFields = firstValues(upload, fields, exceptions)
+            upload.options.multiples = false
 
-            if (singleFields.team) {
-                const { team } = singleFields
-                const teamExists = await Team.findById(team)
+            const profileImage = `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename}`
 
-                if (teamExists === null) {
-                    return next(res.status(404).json('No team can be found with that ID.'))
-                }
-            }
+            // const update = {
+            //     ...req.body,
+            //     userName
+            // }
 
-            if (singleFields.email) {
-                const username = singleFields.email.substring(0, singleFields.email.indexOf('@'))
-                singleFields.userName = username
-            }
-
-            if (singleFields.password) {
-                const salt = await bcrypt.genSalt(10)
-                singleFields.password = await bcrypt.hash(singleFields.password, salt)
-            }
-
-            const update = files?.profileImage?.[0]
-                ? {
-                      ...singleFields,
-                      profileImage: {
-                          fileName: files.profileImage[0].newFilename,
-                          filePath: files.profileImage[0].filepath,
-                          fileType: files.profileImage[0].mimetype,
-                          fileSize: files.profileImage[0].size,
-                      },
-                  }
-                : singleFields
-
-            const user = await User.findByIdAndUpdate({ _id: req.params.id }, update, { new: true })
+            const user = await User.findByIdAndUpdate(
+                { _id: req.params.id },
+                {
+                    ...fields,
+                    userName,
+                    profileImage,
+                },
+                { new: true }
+            )
 
             await user.save()
 
-            if (prevTeam.team) {
-                const team = await Team.findByIdAndUpdate({ _id: prevTeam.team }, { $pullAll: { users: [{ _id: user._id }] } }, { new: true })
+            if (team) {
+                if (prevTeam.team) {
+                    const removeFromTeam = await Team.findByIdAndUpdate({ _id: prevTeam.team }, { $pullAll: { users: [{ _id: user._id }] } }, { new: true })
 
-                await team.save()
-            }
-            if (singleFields.team) {
-                const team = await Team.findByIdAndUpdate({ _id: singleFields.team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
+                    await removeFromTeam.save()
+                }
 
-                await team.save()
+                const addToTeam = await Team.findByIdAndUpdate({ _id: team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
+
+                await addToTeam.save()
             }
+
+            // console.log((upload.options.multiples = false))
+            // console.log(upload.options)
+
+            // const exceptions = ['']
+            // const singleFields = firstValues(upload, fields, exceptions)
+
+            // if (singleFields.team) {
+            //     const { team } = singleFields
+            //     const teamExists = await Team.findById(team)
+
+            //     if (teamExists === null) {
+            //         return next(res.status(404).json('No team can be found with that ID.'))
+            //     }
+            // }
+
+            // if (singleFields.email) {
+            //     const username = singleFields.email.substring(0, singleFields.email.indexOf('@'))
+            //     singleFields.userName = username
+            // }
+
+            // if (singleFields.password) {
+            //     const salt = await bcrypt.genSalt(10)
+            //     singleFields.password = await bcrypt.hash(singleFields.password, salt)
+            // }
+
+            // const update = files?.profileImage?.[0]
+            //     ? {
+            //           ...singleFields,
+            //           profileImage: {
+            //               fileUrl: `${req.protocol}://${req.get('host')}/uploads/images/${files.profileImage[0].newFilename}`,
+            //               fileName: files.profileImage[0].newFilename,
+            //               filePath: files.profileImage[0].filepath,
+            //               fileType: files.profileImage[0].mimetype,
+            //               fileSize: files.profileImage[0].size,
+            //           },
+            //       }
+            //     : singleFields
+
+            // const user = await User.findByIdAndUpdate({ _id: req.params.id }, update, { new: true })
+
+            // await user.save()
+
+            // if (prevTeam.team) {
+            //     const team = await Team.findByIdAndUpdate({ _id: prevTeam.team }, { $pullAll: { users: [{ _id: user._id }] } }, { new: true })
+
+            //     await team.save()
+            // }
+            // if (singleFields.team) {
+            //     const team = await Team.findByIdAndUpdate({ _id: singleFields.team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
+
+            //     await team.save()
+            // }
 
             res.status(200).json(user)
         })

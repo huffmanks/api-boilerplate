@@ -1,5 +1,5 @@
 export const sendToken = (res, statusCode, user, refreshToken, accessToken, message) => {
-    const profileImage = !user.profileImage.fileName ? undefined : `${process.env.SERVER_URL}/uploads/images/${user.profileImage.fileName}`
+    // const profileImage = !user.profileImage.fileName ? undefined : `${process.env.SERVER_URL}/uploads/images/${user.profileImage.fileName}`
 
     return res
         .cookie('refreshToken', refreshToken, { httpOnly: true })
@@ -11,7 +11,7 @@ export const sendToken = (res, statusCode, user, refreshToken, accessToken, mess
                 email: user.email,
                 team: user.team,
                 role: user.role,
-                profileImage,
+                profileImage: user?.profileImage,
             },
             accessToken,
             message,
