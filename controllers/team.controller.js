@@ -1,14 +1,19 @@
 import { User, Team } from '../models/index.js'
-import { firstValues } from 'formidable/src/helpers/firstValues.js'
-import upload from '../utils/fileUpload.util.js'
+// import { firstValues } from 'formidable/src/helpers/firstValues.js'
+// import { singleImageUpload } from '../utils/singleImageUpload.util.js'
+import { errorResponse, firstValues, singleImageUpload } from '../utils/index.js'
 
 export const getSingleTeam = async (req, res, next) => {
     try {
         const team = await Team.findById({ _id: req.params.id }).populate('users', 'firstName userName profileImage')
 
+        if (!team) {
+            return errorResponse(res, 404, { name: 'NotFound', message: 'No team can be found with that ID.' })
+        }
+
         res.json(team)
     } catch (err) {
-        return next(res.status(404).json(`No team can be found with that ID.\n ${err.message}`))
+        next(err)
     }
 }
 
@@ -16,24 +21,27 @@ export const getAllTeams = async (req, res, next) => {
     try {
         const teams = await Team.find({}).populate('users', 'firstName userName profileImage')
 
+        if (!teams) {
+            return errorResponse(res, 404, { name: 'NotFound', message: 'No teams can be found.' })
+        }
+
         res.json(teams)
     } catch (err) {
-        return next(res.status(404).json(`No teams can be found.\n ${err.message}`))
+        next(err)
     }
 }
 
 export const createTeam = async (req, res, next) => {
-    try {
-        upload.parse(req, async (err, fields, files) => {
-            if (err) {
-                next(err)
-                return
-            }
+    singleImageUpload.parse(req, async (err, fields, files) => {
+        if (err) {
+            next(err)
+        }
+        try {
+            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
 
             const exceptions = ['users']
-            const singleFields = firstValues(upload, fields, exceptions)
-
-            const { title, description, users } = singleFields
+            const singleFields = firstValues(fields, exceptions)
+            const { users } = singleFields
 
             if (users) {
                 const usersList = await User.find({ _id: { $in: users } })
@@ -50,15 +58,8 @@ export const createTeam = async (req, res, next) => {
             }
 
             const team = await Team.create({
-                title,
-                description,
-                users,
-                teamImage: {
-                    fileName: files?.teamImage?.[0]?.newFilename,
-                    filePath: files?.teamImage?.[0]?.filepath,
-                    fileType: files?.teamImage?.[0]?.mimetype,
-                    fileSize: files?.teamImage?.[0]?.size,
-                },
+                ...singleFields,
+                teamImage,
             })
 
             if (users) {
@@ -66,23 +67,24 @@ export const createTeam = async (req, res, next) => {
             }
 
             res.status(201).json(team)
-        })
-    } catch (err) {
-        return next(err)
-    }
+        } catch (err) {
+            next(err)
+        }
+    })
 }
 
 export const updateTeam = async (req, res, next) => {
-    try {
-        const prevUsers = await User.find({ team: req.params.id }).select('team')
+    singleImageUpload.parse(req, async (err, fields, files) => {
+        if (err) {
+            next(err)
+        }
+        try {
+            const prevUsers = await User.find({ team: req.params.id }).select('team')
 
-        upload.parse(req, async (err, fields, files) => {
-            if (err) {
-                next(err)
-                return
-            }
+            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
+
             const exceptions = ['users']
-            const singleFields = firstValues(upload, fields, exceptions)
+            const singleFields = firstValues(fields, exceptions)
 
             if (singleFields.users) {
                 const { users } = singleFields
@@ -99,19 +101,14 @@ export const updateTeam = async (req, res, next) => {
                 }
             }
 
-            const update = files?.teamImage?.[0]
-                ? {
-                      ...singleFields,
-                      teamImage: {
-                          fileName: files.teamImage[0].newFilename,
-                          filePath: files.teamImage[0].filepath,
-                          fileType: files.teamImage[0].mimetype,
-                          fileSize: files.teamImage[0].size,
-                      },
-                  }
-                : singleFields
-
-            const team = await Team.findByIdAndUpdate({ _id: req.params.id }, update, { new: true })
+            const team = await Team.findByIdAndUpdate(
+                { _id: req.params.id },
+                {
+                    ...singleFields,
+                    teamImage,
+                },
+                { new: true }
+            )
 
             await team.save()
 
@@ -130,10 +127,10 @@ export const updateTeam = async (req, res, next) => {
             }
 
             res.status(200).json(team)
-        })
-    } catch (err) {
-        next(err)
-    }
+        } catch (err) {
+            next(err)
+        }
+    })
 }
 
 export const deleteTeam = async (req, res, next) => {

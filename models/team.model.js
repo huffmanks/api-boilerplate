@@ -18,18 +18,7 @@ const TeamSchema = new Schema(
             },
         ],
         teamImage: {
-            fileName: {
-                type: String,
-            },
-            filePath: {
-                type: String,
-            },
-            fileType: {
-                type: String,
-            },
-            fileSize: {
-                type: String,
-            },
+            type: String,
         },
     },
     {

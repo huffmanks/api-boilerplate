@@ -6,9 +6,9 @@ const options = {
     multiples: true,
 }
 
-const upload = formidable(options)
+const multipleFilesUpload = formidable(options)
 
-upload.on('fileBegin', (formName, file) => {
+multipleFilesUpload.on('fileBegin', (formName, file) => {
     if (file.mimetype && file.mimetype.includes('image')) {
         file.filepath = path.join('uploads/images', file.newFilename)
     } else {
@@ -16,4 +16,4 @@ upload.on('fileBegin', (formName, file) => {
     }
 })
 
-export default upload
+export { multipleFilesUpload }
