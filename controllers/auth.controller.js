@@ -1,25 +1,25 @@
 import crypto from 'crypto'
 import jwt from 'jsonwebtoken'
 import { User } from '../models/index.js'
-import { sendToken } from '../utils/index.js'
+import { errorResponse, sendToken } from '../utils/index.js'
 
 export const login = async (req, res, next) => {
     const { email, password } = req.body
 
     if (!email || !password) {
-        return next(res.status(400).json('Please provide an email and password.'))
+        return errorResponse(res, 400, { name: 'Bad Request', message: 'Please provide both an email and a password.' })
     }
     try {
         const user = await User.findOne({ email }).select('+password')
 
         if (!user) {
-            return next(res.status(401).json('Invalid credentials.'))
+            return errorResponse(res, 404, { name: 'Not Found', message: 'No account found with that email.' })
         }
 
         const isMatch = await user.matchPassword(password)
 
         if (!isMatch) {
-            return next(res.status(401).json('Invalid credentials.'))
+            return errorResponse(res, 401, { name: 'Unauthorized', message: 'Invalid credentials.' })
         }
 
         const refreshToken = user.getSignedToken(process.env.JWT_REFRESH_TOKEN_SECRET, process.env.JWT_REFRESH_TOKEN_EXPIRE)
@@ -38,16 +38,8 @@ export const login = async (req, res, next) => {
 export const register = async (req, res, next) => {
     const { email, password } = req.body
 
-    if (!email) {
-        return next(res.status(400).json('Please provide an email.'))
-    }
-
-    if (!password) {
-        return next(res.status(400).json('Please provide a password.'))
-    }
-
-    if (!email && !password) {
-        return next(res.status(400).json('Please provide an email and password.'))
+    if (!email || !password) {
+        return errorResponse(res, 400, { name: 'Bad Request', message: 'Please provide both an email and a password.' })
     }
 
     try {
@@ -73,31 +65,29 @@ export const forgotPassword = async (req, res, next) => {
     const { email } = req.body
 
     if (!email) {
-        return next(res.status(404).json('Please provide an email.'))
+        return errorResponse(res, 400, { name: 'Bad Request', message: 'Please provide an email.' })
+    }
+
+    const user = await User.findOne({ email })
+
+    if (!user) {
+        return errorResponse(res, 404, { name: 'Not Found', message: 'No account found with that email.' })
     }
 
     try {
-        const user = await User.findOne({ email })
-
-        if (!user) {
-            return next(res.status(404).json('No account found with that email.'))
-        }
-
         const resetPasswordToken = user.getResetPasswordToken()
 
         await user.save()
 
-        try {
-            res.status(200).json({ resetPasswordToken })
-        } catch (err) {
-            user.resetPasswordToken = undefined
-            user.resetPasswordExpire = undefined
-
-            await user.save()
-            return next(res.status(500).json('Email could not be sent.'))
-        }
+        // Add email with magic link
+        res.status(200).json({ resetPasswordToken })
     } catch (err) {
-        next(err)
+        user.resetPasswordToken = undefined
+        user.resetPasswordExpire = undefined
+
+        await user.save()
+
+        return errorResponse(res, 500, { name: 'Internal Server Error', message: 'Email could not be sent.' })
     }
 }
 
@@ -110,7 +100,7 @@ export const resetPassword = async (req, res, next) => {
         })
 
         if (!user) {
-            return next(res.status(400).json('Invalid reset password token!'))
+            return errorResponse(res, 400, { name: 'Bad Request', message: 'Invalid reset password token!' })
         }
 
         if (user.resetPasswordExpire < Date.now()) {
@@ -119,7 +109,7 @@ export const resetPassword = async (req, res, next) => {
 
             await user.save()
 
-            return next(res.status(401).json('Reset password token has expired!'))
+            return errorResponse(res, 401, { name: 'Unauthorized', message: 'Reset password token has expired!' })
         }
 
         const refreshToken = user.getSignedToken(process.env.JWT_REFRESH_TOKEN_SECRET, process.env.JWT_REFRESH_TOKEN_EXPIRE)
@@ -139,50 +129,69 @@ export const resetPassword = async (req, res, next) => {
     }
 }
 
-export const logout = async (req, res) => {
+export const logout = async (req, res, next) => {
     const cookies = req.cookies
 
     if (!cookies?.refreshToken) {
-        res.sendStatus(204)
+        return res.sendStatus(204)
     }
 
     const { refreshToken } = cookies
 
-    const user = await User.findOne({ refreshToken }).exec()
-    if (!user) {
+    try {
+        const user = await User.findOne({ refreshToken })
+
+        if (!user) {
+            res.clearCookie('refreshToken', { httpOnly: true })
+            return res.sendStatus(204)
+        }
+
+        user.refreshToken = ''
+        await user.save()
+
         res.clearCookie('refreshToken', { httpOnly: true })
-        return res.sendStatus(204)
+        res.sendStatus(204)
+    } catch (err) {
+        next(err)
     }
-
-    user.refreshToken = ''
-    await user.save()
-
-    res.clearCookie('refreshToken', { httpOnly: true })
-    res.sendStatus(204)
 }
 
-export const refresh = async (req, res) => {
+export const refresh = async (req, res, next) => {
     const cookies = req.cookies
 
-    if (!cookies?.refreshToken) return res.status(400).json('Invalid refresh token!')
-    const refreshToken = cookies.refreshToken
+    if (!cookies?.refreshToken) {
+        return errorResponse(res, 400, { name: 'Bad Request', message: 'Invalid refresh token!' })
+    }
 
-    const user = await User.findOne({ refreshToken }).exec()
-    if (!user) return res.status(401).json('Unauthorized refresh token!')
+    const { refreshToken } = cookies
 
-    jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN_SECRET, (err, decoded) => {
-        if (err || user.email !== decoded.user.email) return res.sendStatus(403)
+    try {
+        const user = await User.findOne({ refreshToken })
 
-        const accessToken = jwt.sign(
-            {
-                user: {
-                    email: decoded.user.email,
-                    role: user.role,
+        if (!user) {
+            return errorResponse(res, 401, { name: 'Unauthorized', message: 'Unauthorized refresh token!' })
+        }
+
+        jwt.verify(refreshToken, process.env.JWT_REFRESH_TOKEN_SECRET, (err, decoded) => {
+            if (err || user.email !== decoded.user.email) {
+                return errorResponse(res, 403, { name: 'Forbidden', message: 'Invalid refresh token!' })
+            }
+
+            const accessToken = jwt.sign(
+                {
+                    user: {
+                        id: user._id,
+                        email: decoded.user.email,
+                        role: user.role,
+                    },
                 },
-            },
-            process.env.JWT_ACCESS_TOKEN_SECRET,
-            { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRE }
-        )
-        res.json({ accessToken })
-    })
+                process.env.JWT_ACCESS_TOKEN_SECRET,
+                { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRE }
+            )
+
+            res.status(201).json({ accessToken })
+        })
+    } catch (err) {
+        next(err)
+    }
 }

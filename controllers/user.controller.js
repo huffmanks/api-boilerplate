@@ -34,9 +34,14 @@ export const createUser = async (req, res, next) => {
     singleImageUpload.parse(req, async (err, fields, files) => {
         if (err) {
             next(err)
+            return
         }
         try {
-            const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename}` : undefined
+            const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename.toLowerCase()}` : undefined
+
+            if (files?.profileImage?.[0] && !files?.profileImage?.[0]?.mimetype.includes('image')) {
+                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The profile image field only accepts an image file type.' })
+            }
 
             const singleFields = firstValues(fields)
 
@@ -48,7 +53,7 @@ export const createUser = async (req, res, next) => {
                 const teamExists = await Team.findById(team)
 
                 if (teamExists === null) {
-                    return next(res.status(404).json('No team can be found with that ID.'))
+                    return errorResponse(res, 404, { name: 'Not Found', message: 'No team can be found with that ID.' })
                 }
             }
 
@@ -75,11 +80,16 @@ export const updateUser = async (req, res, next) => {
     singleImageUpload.parse(req, async (err, fields, files) => {
         if (err) {
             next(err)
+            return
         }
         try {
             const prevTeam = await User.findById({ _id: req.params.id }).select('team')
 
             const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename}` : undefined
+
+            if (files?.profileImage?.[0] && !files?.profileImage?.[0]?.mimetype.includes('image')) {
+                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The profile image field only accepts an image file type.' })
+            }
 
             const singleFields = firstValues(fields)
 
@@ -93,7 +103,7 @@ export const updateUser = async (req, res, next) => {
 
             if (singleFields.password) {
                 if (singleFields.password.length < 6) {
-                    return next(res.status(403).json('Password needs to be longer.'))
+                    return errorResponse(res, 403, { name: 'Forbidden', message: 'Password needs to be longer.' })
                 }
                 const salt = await bcrypt.genSalt(10)
                 singleFields.password = await bcrypt.hash(singleFields.password, salt)
@@ -103,7 +113,7 @@ export const updateUser = async (req, res, next) => {
                 const teamExists = await Team.findById(team)
 
                 if (teamExists === null) {
-                    return next(res.status(404).json('No team can be found with that ID.'))
+                    return errorResponse(res, 404, { name: 'Not Found', message: 'No team can be found with that ID.' })
                 }
             }
 
@@ -142,7 +152,7 @@ export const deleteUser = async (req, res, next) => {
     try {
         User.findOneAndDelete({ _id: req.params.id }, async (err, doc) => {
             if (err) {
-                return next(res.status(404).json('No user can be found with that ID.'))
+                return errorResponse(res, 404, { name: 'Not Found', message: 'No user can be found with that ID.' })
             }
 
             if (doc.team) {

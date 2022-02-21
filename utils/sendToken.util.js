@@ -1,6 +1,6 @@
 export const sendToken = (res, statusCode, user, refreshToken, accessToken, message) => {
     return res
-        .cookie('refreshToken', refreshToken, { httpOnly: true })
+        .cookie('refreshToken', refreshToken, { httpOnly: true, maxAge: 24 * 60 * 60 * 1000 })
         .status(statusCode)
         .json({
             user: {

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import { User, Team } from '../models/index.js'
 // import { firstValues } from 'formidable/src/helpers/firstValues.js'
 // import { singleImageUpload } from '../utils/singleImageUpload.util.js'
@@ -35,25 +36,40 @@ export const createTeam = async (req, res, next) => {
     singleImageUpload.parse(req, async (err, fields, files) => {
         if (err) {
             next(err)
+            return
         }
         try {
             const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
+
+            if (files?.teamImage?.[0] && !files?.teamImage?.[0]?.mimetype.includes('image')) {
+                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The team image field only accepts an image file type.' })
+            }
 
             const exceptions = ['users']
             const singleFields = firstValues(fields, exceptions)
             const { users } = singleFields
 
             if (users) {
+                const usersIdIsValid = users.map((userId) => {
+                    if (mongoose.isValidObjectId(userId)) {
+                        return userId
+                    }
+                })
+
+                if (!usersIdIsValid.every(Boolean)) {
+                    return errorResponse(res, 400, { name: 'Bad Request', message: 'One or more users ID(s) are invalid.' })
+                }
+
                 const usersList = await User.find({ _id: { $in: users } })
 
-                const usersID = usersList.map((ul) => ul._id.toString())
+                const usersId = usersList.map((ul) => ul._id.toString())
 
                 const matchedUsers = users.every((uid) => {
-                    return usersID.includes(uid)
+                    return usersId.includes(uid)
                 })
 
                 if (!matchedUsers) {
-                    return next(res.status(404).json('One or more users can not be found with the ID(s).'))
+                    return errorResponse(res, 404, { name: 'Not Found', message: 'One or more users can not be found with the ID(s).' })
                 }
             }
 
@@ -77,27 +93,42 @@ export const updateTeam = async (req, res, next) => {
     singleImageUpload.parse(req, async (err, fields, files) => {
         if (err) {
             next(err)
+            return
         }
         try {
             const prevUsers = await User.find({ team: req.params.id }).select('team')
 
             const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
 
+            if (files?.teamImage?.[0] && !files?.teamImage?.[0]?.mimetype.includes('image')) {
+                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The team image field only accepts an image file type.' })
+            }
+
             const exceptions = ['users']
             const singleFields = firstValues(fields, exceptions)
+            const { users } = singleFields
 
-            if (singleFields.users) {
-                const { users } = singleFields
+            if (users) {
+                const usersIdIsValid = users.map((userId) => {
+                    if (mongoose.isValidObjectId(userId)) {
+                        return userId
+                    }
+                })
+
+                if (!usersIdIsValid.every(Boolean)) {
+                    return errorResponse(res, 400, { name: 'Bad Request', message: 'One or more users ID(s) are invalid.' })
+                }
+
                 const usersList = await User.find({ _id: { $in: users } })
 
-                const usersID = usersList.map((ul) => ul._id.toString())
+                const usersId = usersList.map((ul) => ul._id.toString())
 
                 const matchedUsers = users.every((uid) => {
-                    return usersID.includes(uid)
+                    return usersId.includes(uid)
                 })
 
                 if (!matchedUsers) {
-                    return next(res.status(404).json('One or more users can not be found with the ID(s).'))
+                    return errorResponse(res, 404, { name: 'Not Found', message: 'One or more users can not be found with the ID(s).' })
                 }
             }
 
@@ -112,17 +143,17 @@ export const updateTeam = async (req, res, next) => {
 
             await team.save()
 
+            // Fix and refactor
+
             if (prevUsers.length > 0) {
                 const prevUserIDs = prevUsers.map((user) => user._id.toString())
 
-                const removedUsers = prevUserIDs.filter((id) => !singleFields.users.includes(id))
+                const removedUsers = prevUserIDs.filter((id) => !users.includes(id))
 
                 await User.updateMany({ _id: { $in: removedUsers } }, { $unset: { team: null } }, { new: true })
             }
 
-            if (singleFields.users) {
-                const { users } = singleFields
-
+            if (users) {
                 await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } }, { new: true })
             }
 
@@ -137,7 +168,7 @@ export const deleteTeam = async (req, res, next) => {
     try {
         Team.findOneAndDelete({ _id: req.params.id }, async (err, doc) => {
             if (err) {
-                return next(res.status(404).json('No team can be found with that ID.'))
+                return errorResponse(res, 404, { name: 'Not Found', message: 'No team can be found with that ID.' })
             }
 
             if (doc.users) {

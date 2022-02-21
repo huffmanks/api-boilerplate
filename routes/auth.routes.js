@@ -8,6 +8,6 @@ router.route('/login').post(login)
 router.route('/forgot-password').post(forgotPassword)
 router.route('/reset-password/:resetPasswordToken').post(resetPassword)
 router.route('/refresh').get(refresh)
-router.route('/logout').get(logout)
+router.route('/logout').post(logout)
 
 export default router
