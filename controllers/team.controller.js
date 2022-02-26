@@ -1,7 +1,5 @@
 import mongoose from 'mongoose'
 import { User, Team } from '../models/index.js'
-// import { firstValues } from 'formidable/src/helpers/firstValues.js'
-// import { singleImageUpload } from '../utils/singleImageUpload.util.js'
 import { errorResponse, firstValues, singleImageUpload } from '../utils/index.js'
 
 export const getSingleTeam = async (req, res, next) => {
@@ -78,6 +76,16 @@ export const createTeam = async (req, res, next) => {
                 teamImage,
             })
 
+            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
+
+            if (prevUsers?.[0]?.team) {
+                const prevUsersIds = prevUsers.map((user) => user._id.toString())
+
+                const uniquePrevTeamsIds = [...new Set(prevUsers.map((user) => user.team.toString()))]
+
+                await Team.updateMany({ _id: uniquePrevTeamsIds }, { $pullAll: { users: prevUsersIds } }, { new: true })
+            }
+
             if (users) {
                 await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } })
             }
@@ -96,8 +104,6 @@ export const updateTeam = async (req, res, next) => {
             return
         }
         try {
-            const prevUsers = await User.find({ team: req.params.id }).select('team')
-
             const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
 
             if (files?.teamImage?.[0] && !files?.teamImage?.[0]?.mimetype.includes('image')) {
@@ -107,6 +113,8 @@ export const updateTeam = async (req, res, next) => {
             const exceptions = ['users']
             const singleFields = firstValues(fields, exceptions)
             const { users } = singleFields
+
+            const singleFieldsWithoutUsers = (({ users, ...rest }) => rest)(singleFields)
 
             if (users) {
                 const usersIdIsValid = users.map((userId) => {
@@ -135,22 +143,25 @@ export const updateTeam = async (req, res, next) => {
             const team = await Team.findByIdAndUpdate(
                 { _id: req.params.id },
                 {
-                    ...singleFields,
+                    $set: { ...singleFieldsWithoutUsers },
+                    $addToSet: { users: users },
                     teamImage,
                 },
                 { new: true }
             )
 
-            await team.save()
+            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
 
-            // Fix and refactor
+            if (prevUsers?.[0]?.team) {
+                const prevUsersIds = prevUsers.map((user) => user._id.toString())
 
-            if (prevUsers.length > 0) {
-                const prevUserIDs = prevUsers.map((user) => user._id.toString())
+                const uniquePrevTeamsIds = [...new Set(prevUsers.map((user) => user.team.toString()))]
 
-                const removedUsers = prevUserIDs.filter((id) => !users.includes(id))
+                const removeUsersPrevTeamIds = uniquePrevTeamsIds.filter((id) => !req.params.id.includes(id))
 
-                await User.updateMany({ _id: { $in: removedUsers } }, { $unset: { team: null } }, { new: true })
+                if (removeUsersPrevTeamIds.length > 0) {
+                    const updatedTeams = await Team.updateMany({ _id: removeUsersPrevTeamIds }, { $pull: { users: { $in: prevUsersIds } } }, { new: true })
+                }
             }
 
             if (users) {

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose'
 import bcrypt from 'bcryptjs'
 import { User, Team } from '../models/index.js'
 import { errorResponse, firstValues, singleImageUpload } from '../utils/index.js'
@@ -45,28 +46,29 @@ export const createUser = async (req, res, next) => {
 
             const singleFields = firstValues(fields)
 
-            const { email, team } = singleFields
-
-            const userName = email.substring(0, email.indexOf('@'))
+            const { team } = singleFields
 
             if (team) {
-                const teamExists = await Team.findById(team)
+                const teamIdIsValid = mongoose.isValidObjectId(team)
 
-                if (teamExists === null) {
+                if (!teamIdIsValid) {
+                    return errorResponse(res, 400, { name: 'Bad Request', message: 'The team ID is invalid.' })
+                }
+
+                const teamExists = await Team.findById({ _id: team })
+
+                if (!teamExists) {
                     return errorResponse(res, 404, { name: 'Not Found', message: 'No team can be found with that ID.' })
                 }
             }
 
             const user = await User.create({
                 ...singleFields,
-                userName,
                 profileImage,
             })
 
             if (team) {
-                const addUserToTeam = await Team.findByIdAndUpdate({ _id: team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
-
-                await addUserToTeam.save()
+                await Team.findByIdAndUpdate({ _id: team }, { $push: { users: user._id } }, { new: true })
             }
 
             res.status(201).json(user)
@@ -93,26 +95,30 @@ export const updateUser = async (req, res, next) => {
 
             const singleFields = firstValues(fields)
 
-            const { email, team } = singleFields
-            let userName
+            const { email, password, team } = singleFields
 
             if (email) {
-                const username = email.substring(0, email.indexOf('@'))
-                userName = username
+                singleFields.userName = email.substring(0, email.indexOf('@'))
             }
 
-            if (singleFields.password) {
-                if (singleFields.password.length < 6) {
-                    return errorResponse(res, 403, { name: 'Forbidden', message: 'Password needs to be longer.' })
+            if (password) {
+                if (password.length < 6) {
+                    return errorResponse(res, 403, { name: 'Forbidden', message: `The password, '${password}', is less than 6 characters.` })
                 }
                 const salt = await bcrypt.genSalt(10)
-                singleFields.password = await bcrypt.hash(singleFields.password, salt)
+                singleFields.password = await bcrypt.hash(password, salt)
             }
 
             if (team) {
-                const teamExists = await Team.findById(team)
+                const teamIdIsValid = mongoose.isValidObjectId(team)
 
-                if (teamExists === null) {
+                if (!teamIdIsValid) {
+                    return errorResponse(res, 400, { name: 'Bad Request', message: 'The team ID is invalid.' })
+                }
+
+                const teamExists = await Team.findById({ _id: team })
+
+                if (!teamExists) {
                     return errorResponse(res, 404, { name: 'Not Found', message: 'No team can be found with that ID.' })
                 }
             }
@@ -121,24 +127,17 @@ export const updateUser = async (req, res, next) => {
                 { _id: req.params.id },
                 {
                     ...singleFields,
-                    userName,
                     profileImage,
                 },
                 { new: true }
             )
 
-            await user.save()
-
             if (team) {
                 if (prevTeam.team) {
-                    const removeUserFromTeam = await Team.findByIdAndUpdate({ _id: prevTeam.team }, { $pullAll: { users: [{ _id: user._id }] } }, { new: true })
-
-                    await removeUserFromTeam.save()
+                    await Team.findByIdAndUpdate({ _id: prevTeam.team }, { $pull: { users: user._id } }, { new: true })
                 }
 
-                const addUserToTeam = await Team.findByIdAndUpdate({ _id: team }, { $push: { users: [{ _id: user._id }] } }, { new: true })
-
-                await addUserToTeam.save()
+                await Team.findByIdAndUpdate({ _id: team }, { $push: { users: user._id } }, { new: true })
             }
 
             res.status(200).json(user)
@@ -156,9 +155,7 @@ export const deleteUser = async (req, res, next) => {
             }
 
             if (doc.team) {
-                const team = await Team.findByIdAndUpdate({ _id: doc.team }, { $pullAll: { users: [{ _id: doc._id }] } }, { new: true })
-
-                await team.save()
+                await Team.findByIdAndUpdate({ _id: doc.team }, { $pull: { users: doc._id } }, { new: true })
             }
 
             res.status(200).json(doc)

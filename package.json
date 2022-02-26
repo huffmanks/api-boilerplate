@@ -2,7 +2,7 @@
     "name": "api-boilerplate",
     "version": "1.0.0",
     "type": "module",
-    "main": "servers.js",
+    "main": "server.js",
     "license": "MIT",
     "scripts": {
         "server": "nodemon server"

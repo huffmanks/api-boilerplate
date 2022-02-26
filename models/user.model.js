@@ -55,19 +55,26 @@ const UserSchema = new Schema(
 )
 
 UserSchema.pre('save', async function (next) {
-    const username = this.email.substring(0, this.email.indexOf('@'))
-    this.userName = username
+    this.userName = this.email.substring(0, this.email.indexOf('@'))
+
+    const salt = await bcrypt.genSalt(10)
+    const hashedPassword = await bcrypt.hash(this.password, salt)
+
+    this.password = hashedPassword
 
     return next()
 })
-
-UserSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) {
-        next()
+UserSchema.pre('findByIdAndUpdate', async function (next) {
+    if (this.isModified('email')) {
+        this.userName = this.email.substring(0, this.email.indexOf('@'))
     }
 
-    const salt = await bcrypt.genSalt(10)
-    this.password = await bcrypt.hash(this.password, salt)
+    if (this.isModified('password')) {
+        const salt = await bcrypt.genSalt(10)
+        const hashedPassword = await bcrypt.hash(this.password, salt)
+
+        this.password = hashedPassword
+    }
 
     return next()
 })
