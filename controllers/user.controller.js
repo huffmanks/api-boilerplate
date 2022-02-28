@@ -1,5 +1,4 @@
 import mongoose from 'mongoose'
-import bcrypt from 'bcryptjs'
 import { User, Team } from '../models/index.js'
 import { errorResponse, firstValues, singleImageUpload } from '../utils/index.js'
 
@@ -38,12 +37,6 @@ export const createUser = async (req, res, next) => {
             return
         }
         try {
-            const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename.toLowerCase()}` : undefined
-
-            if (files?.profileImage?.[0] && !files?.profileImage?.[0]?.mimetype.includes('image')) {
-                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The profile image field only accepts an image file type.' })
-            }
-
             const singleFields = firstValues(fields)
 
             const { team } = singleFields
@@ -62,6 +55,8 @@ export const createUser = async (req, res, next) => {
                 }
             }
 
+            const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename.toLowerCase()}` : undefined
+
             const user = await User.create({
                 ...singleFields,
                 profileImage,
@@ -71,7 +66,9 @@ export const createUser = async (req, res, next) => {
                 await Team.findByIdAndUpdate({ _id: team }, { $push: { users: user._id } }, { new: true })
             }
 
-            res.status(201).json(user)
+            const { password, ...newUser } = user._doc
+
+            res.status(201).json(newUser)
         } catch (err) {
             next(err)
         }
@@ -85,29 +82,9 @@ export const updateUser = async (req, res, next) => {
             return
         }
         try {
-            const prevTeam = await User.findById({ _id: req.params.id }).select('team')
-
-            const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename}` : undefined
-
-            if (files?.profileImage?.[0] && !files?.profileImage?.[0]?.mimetype.includes('image')) {
-                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The profile image field only accepts an image file type.' })
-            }
-
             const singleFields = firstValues(fields)
 
-            const { email, password, team } = singleFields
-
-            if (email) {
-                singleFields.userName = email.substring(0, email.indexOf('@'))
-            }
-
-            if (password) {
-                if (password.length < 6) {
-                    return errorResponse(res, 403, { name: 'Forbidden', message: `The password, '${password}', is less than 6 characters.` })
-                }
-                const salt = await bcrypt.genSalt(10)
-                singleFields.password = await bcrypt.hash(password, salt)
-            }
+            const { team } = singleFields
 
             if (team) {
                 const teamIdIsValid = mongoose.isValidObjectId(team)
@@ -122,6 +99,10 @@ export const updateUser = async (req, res, next) => {
                     return errorResponse(res, 404, { name: 'Not Found', message: 'No team can be found with that ID.' })
                 }
             }
+
+            const prevTeam = await User.findById({ _id: req.params.id }).select('team')
+
+            const profileImage = files?.profileImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.profileImage[0].newFilename.toLowerCase()}` : undefined
 
             const user = await User.findByIdAndUpdate(
                 { _id: req.params.id },

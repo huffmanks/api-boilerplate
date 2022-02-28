@@ -37,12 +37,6 @@ export const createTeam = async (req, res, next) => {
             return
         }
         try {
-            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
-
-            if (files?.teamImage?.[0] && !files?.teamImage?.[0]?.mimetype.includes('image')) {
-                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The team image field only accepts an image file type.' })
-            }
-
             const exceptions = ['users']
             const singleFields = firstValues(fields, exceptions)
             const { users } = singleFields
@@ -71,12 +65,14 @@ export const createTeam = async (req, res, next) => {
                 }
             }
 
+            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
+
+            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename.toLowerCase()}` : undefined
+
             const team = await Team.create({
                 ...singleFields,
                 teamImage,
             })
-
-            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
 
             if (prevUsers?.[0]?.team) {
                 const prevUsersIds = prevUsers.map((user) => user._id.toString())
@@ -104,17 +100,9 @@ export const updateTeam = async (req, res, next) => {
             return
         }
         try {
-            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename}` : undefined
-
-            if (files?.teamImage?.[0] && !files?.teamImage?.[0]?.mimetype.includes('image')) {
-                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The team image field only accepts an image file type.' })
-            }
-
             const exceptions = ['users']
             const singleFields = firstValues(fields, exceptions)
             const { users } = singleFields
-
-            const singleFieldsWithoutUsers = (({ users, ...rest }) => rest)(singleFields)
 
             if (users) {
                 const usersIdIsValid = users.map((userId) => {
@@ -140,6 +128,12 @@ export const updateTeam = async (req, res, next) => {
                 }
             }
 
+            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
+
+            const { users: newUsers, ...singleFieldsWithoutUsers } = singleFields
+
+            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename.toLowerCase()}` : undefined
+
             const team = await Team.findByIdAndUpdate(
                 { _id: req.params.id },
                 {
@@ -150,8 +144,6 @@ export const updateTeam = async (req, res, next) => {
                 { new: true }
             )
 
-            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
-
             if (prevUsers?.[0]?.team) {
                 const prevUsersIds = prevUsers.map((user) => user._id.toString())
 
@@ -160,7 +152,7 @@ export const updateTeam = async (req, res, next) => {
                 const removeUsersPrevTeamIds = uniquePrevTeamsIds.filter((id) => !req.params.id.includes(id))
 
                 if (removeUsersPrevTeamIds.length > 0) {
-                    const updatedTeams = await Team.updateMany({ _id: removeUsersPrevTeamIds }, { $pull: { users: { $in: prevUsersIds } } }, { new: true })
+                    await Team.updateMany({ _id: removeUsersPrevTeamIds }, { $pull: { users: { $in: prevUsersIds } } }, { new: true })
                 }
             }
 
