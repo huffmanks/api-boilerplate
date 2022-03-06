@@ -17,9 +17,5 @@ export const errorHandler = (err, req, res, next) => {
         return errorResponse(res, 400, { name, message: `The ${path}, '${value}', is not valid.` })
     }
 
-    if (err.name === 'Unsupported Media Type' && err.from === 'File Upload') {
-        return errorResponse(res, 415, { name: 'Unsupported Media Type', message: `The ${err.field} field only accepts ${err.typeAllowed} file types.` })
-    }
-
     return errorResponse(res, 500, { name: err.name, code: err.code, message: err.message })
 }

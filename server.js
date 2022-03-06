@@ -5,6 +5,7 @@ dotenv.config({ path: './config.env' })
 
 import connectDB from './config/db.js'
 
+import fileUpload from 'express-fileupload'
 import path from 'path'
 const __dirname = path.resolve()
 
@@ -27,6 +28,12 @@ app.use(cors())
 app.use(cookieParser())
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')))
+app.use(
+    fileUpload({
+        limits: { files: 1 },
+        preserveExtension: true,
+    })
+)
 
 // Routes
 app.use('/api/auth', authRoutes)

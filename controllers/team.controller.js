@@ -1,6 +1,9 @@
 import mongoose from 'mongoose'
 import { User, Team } from '../models/index.js'
-import { errorResponse, firstValues, singleImageUpload } from '../utils/index.js'
+import path from 'path'
+const __dirname = path.resolve()
+
+import { errorResponse } from '../utils/index.js'
 
 export const getSingleTeam = async (req, res, next) => {
     try {
@@ -31,140 +34,161 @@ export const getAllTeams = async (req, res, next) => {
 }
 
 export const createTeam = async (req, res, next) => {
-    singleImageUpload.parse(req, async (err, fields, files) => {
-        if (err) {
-            next(err)
-            return
-        }
-        try {
-            const exceptions = ['users']
-            const singleFields = firstValues(fields, exceptions)
-            const { users } = singleFields
+    try {
+        const { users } = req.body
 
-            if (users) {
-                const usersIdIsValid = users.map((userId) => {
-                    if (mongoose.isValidObjectId(userId)) {
-                        return userId
-                    }
-                })
-
-                if (!usersIdIsValid.every(Boolean)) {
-                    return errorResponse(res, 400, { name: 'Bad Request', message: 'One or more users ID(s) are invalid.' })
+        if (users) {
+            const usersIdIsValid = users.map((userId) => {
+                if (mongoose.isValidObjectId(userId)) {
+                    return userId
                 }
-
-                const usersList = await User.find({ _id: { $in: users } })
-
-                const usersId = usersList.map((ul) => ul._id.toString())
-
-                const matchedUsers = users.every((uid) => {
-                    return usersId.includes(uid)
-                })
-
-                if (!matchedUsers) {
-                    return errorResponse(res, 404, { name: 'Not Found', message: 'One or more users can not be found with the ID(s).' })
-                }
-            }
-
-            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
-
-            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename.toLowerCase()}` : undefined
-
-            const team = await Team.create({
-                ...singleFields,
-                teamImage,
             })
 
-            if (prevUsers?.[0]?.team) {
-                const prevUsersIds = prevUsers.map((user) => user._id.toString())
-
-                const uniquePrevTeamsIds = [...new Set(prevUsers.map((user) => user.team.toString()))]
-
-                await Team.updateMany({ _id: uniquePrevTeamsIds }, { $pullAll: { users: prevUsersIds } }, { new: true })
+            if (!usersIdIsValid.every(Boolean)) {
+                return errorResponse(res, 400, { name: 'Bad Request', message: 'One or more users ID(s) are invalid.' })
             }
 
-            if (users) {
-                await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } })
-            }
+            const usersList = await User.find({ _id: { $in: users } })
 
-            res.status(201).json(team)
-        } catch (err) {
-            next(err)
+            const usersId = usersList.map((ul) => ul._id.toString())
+
+            const matchedUsers = users.every((uid) => {
+                return usersId.includes(uid)
+            })
+
+            if (!matchedUsers) {
+                return errorResponse(res, 404, { name: 'Not Found', message: 'One or more users can not be found with the ID(s).' })
+            }
         }
-    })
+
+        const prevUsers = await User.find({ _id: { $in: users } }).select('team')
+
+        const team = await Team.create(req.body)
+
+        const teamImage = req?.files?.teamImage
+
+        if (teamImage) {
+            if (!teamImage?.mimetype || !teamImage?.mimetype.includes('image')) {
+                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The image field only accepts image file types.' })
+            }
+
+            const extension = path.extname(teamImage.name)
+            const pathSuffix = `/uploads/images/team/${team._id}${extension.toLowerCase()}`
+
+            const imagePath = __dirname + pathSuffix
+
+            teamImage.mv(imagePath, function (err) {
+                if (err) {
+                    return errorResponse(res, 500, { name: 'Internal Server Error', message: err })
+                }
+            })
+
+            team.teamImage = process.env.SERVER_URL + pathSuffix
+
+            await team.save()
+        }
+
+        if (prevUsers?.[0]?.team) {
+            const prevUsersIds = prevUsers.map((user) => user._id.toString())
+
+            const uniquePrevTeamsIds = [...new Set(prevUsers.map((user) => user.team.toString()))]
+
+            await Team.updateMany({ _id: uniquePrevTeamsIds }, { $pullAll: { users: prevUsersIds } }, { new: true })
+        }
+
+        if (users) {
+            await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } })
+        }
+
+        res.status(201).json(team)
+    } catch (err) {
+        next(err)
+    }
 }
 
 export const updateTeam = async (req, res, next) => {
-    singleImageUpload.parse(req, async (err, fields, files) => {
-        if (err) {
-            next(err)
-            return
+    try {
+        const users = !req.body.users ? undefined : Array.isArray(req.body.users) ? req.body.users : [req.body.users]
+
+        if (users) {
+            const usersIdIsValid = users.map((userId) => {
+                if (mongoose.isValidObjectId(userId)) {
+                    return userId
+                }
+            })
+
+            if (!usersIdIsValid.every(Boolean)) {
+                return errorResponse(res, 400, { name: 'Bad Request', message: 'One or more users ID(s) are invalid.' })
+            }
+
+            const usersList = await User.find({ _id: { $in: users } })
+
+            const usersId = usersList.map((ul) => ul._id.toString())
+
+            const matchedUsers = users.every((uid) => {
+                return usersId.includes(uid)
+            })
+
+            if (!matchedUsers) {
+                return errorResponse(res, 404, { name: 'Not Found', message: 'One or more users can not be found with the ID(s).' })
+            }
         }
-        try {
-            const exceptions = ['users']
-            const singleFields = firstValues(fields, exceptions)
-            const { users } = singleFields
 
-            if (users) {
-                const usersIdIsValid = users.map((userId) => {
-                    if (mongoose.isValidObjectId(userId)) {
-                        return userId
-                    }
-                })
+        const prevUsers = await User.find({ _id: { $in: users } }).select('team')
 
-                if (!usersIdIsValid.every(Boolean)) {
-                    return errorResponse(res, 400, { name: 'Bad Request', message: 'One or more users ID(s) are invalid.' })
-                }
+        const teamImage = req?.files?.teamImage
+        let pathSuffix
 
-                const usersList = await User.find({ _id: { $in: users } })
-
-                const usersId = usersList.map((ul) => ul._id.toString())
-
-                const matchedUsers = users.every((uid) => {
-                    return usersId.includes(uid)
-                })
-
-                if (!matchedUsers) {
-                    return errorResponse(res, 404, { name: 'Not Found', message: 'One or more users can not be found with the ID(s).' })
-                }
+        if (teamImage) {
+            if (!teamImage?.mimetype || !teamImage?.mimetype.includes('image')) {
+                return errorResponse(res, 415, { name: 'Unsupported Media Type', message: 'The image field only accepts image file types.' })
             }
 
-            const prevUsers = await User.find({ _id: { $in: users } }).select('team')
+            const extension = path.extname(teamImage.name)
+            pathSuffix = `/uploads/images/team/${req.params.id}${extension.toLowerCase()}`
 
-            const { users: newUsers, ...singleFieldsWithoutUsers } = singleFields
+            const imagePath = __dirname + pathSuffix
 
-            const teamImage = files?.teamImage?.[0] ? `${process.env.SERVER_URL}/uploads/images/${files.teamImage[0].newFilename.toLowerCase()}` : undefined
-
-            const team = await Team.findByIdAndUpdate(
-                { _id: req.params.id },
-                {
-                    $set: { ...singleFieldsWithoutUsers },
-                    $addToSet: { users: users },
-                    teamImage,
-                },
-                { new: true }
-            )
-
-            if (prevUsers?.[0]?.team) {
-                const prevUsersIds = prevUsers.map((user) => user._id.toString())
-
-                const uniquePrevTeamsIds = [...new Set(prevUsers.map((user) => user.team.toString()))]
-
-                const removeUsersPrevTeamIds = uniquePrevTeamsIds.filter((id) => !req.params.id.includes(id))
-
-                if (removeUsersPrevTeamIds.length > 0) {
-                    await Team.updateMany({ _id: removeUsersPrevTeamIds }, { $pull: { users: { $in: prevUsersIds } } }, { new: true })
+            teamImage.mv(imagePath, function (err) {
+                if (err) {
+                    return errorResponse(res, 500, { name: 'Internal Server Error', message: err })
                 }
-            }
-
-            if (users) {
-                await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } }, { new: true })
-            }
-
-            res.status(200).json(team)
-        } catch (err) {
-            next(err)
+            })
         }
-    })
+
+        const { users: newUsers, ...fieldsWithoutUsers } = req.body
+        const imageUrl = pathSuffix ? process.env.SERVER_URL + pathSuffix : undefined
+
+        const team = await Team.findByIdAndUpdate(
+            { _id: req.params.id },
+            {
+                $set: { ...fieldsWithoutUsers },
+                $addToSet: { users: users },
+                teamImage: imageUrl,
+            },
+            { new: true }
+        )
+
+        if (prevUsers?.[0]?.team) {
+            const prevUsersIds = prevUsers.map((user) => user._id.toString())
+
+            const uniquePrevTeamsIds = [...new Set(prevUsers.map((user) => user.team.toString()))]
+
+            const removeUsersPrevTeamIds = uniquePrevTeamsIds.filter((id) => !req.params.id.includes(id))
+
+            if (removeUsersPrevTeamIds.length > 0) {
+                await Team.updateMany({ _id: removeUsersPrevTeamIds }, { $pull: { users: { $in: prevUsersIds } } }, { new: true })
+            }
+        }
+
+        if (users) {
+            await User.updateMany({ _id: { $in: users } }, { $set: { team: team._id } }, { new: true })
+        }
+
+        res.status(200).json(team)
+    } catch (err) {
+        next(err)
+    }
 }
 
 export const deleteTeam = async (req, res, next) => {
