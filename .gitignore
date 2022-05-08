@@ -13,6 +13,7 @@ node_modules
 # misc
 /todo.md
 config.env
+/*.DS_Store
 .DS_Store
 .env.local
 .env.development.local

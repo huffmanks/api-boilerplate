@@ -79,7 +79,6 @@ export const forgotPassword = async (req, res, next) => {
 
         await user.save()
 
-        // Add email with magic link
         res.status(200).json({ resetPasswordToken })
     } catch (err) {
         user.resetPasswordToken = undefined
@@ -142,14 +141,14 @@ export const logout = async (req, res, next) => {
         const user = await User.findOne({ refreshToken })
 
         if (!user) {
-            res.clearCookie('refreshToken', { httpOnly: true })
+            res.clearCookie('refreshToken', { httpOnly: true, maxAge: 0 })
             return res.sendStatus(204)
         }
 
         user.refreshToken = ''
         await user.save()
 
-        res.clearCookie('refreshToken', { httpOnly: true })
+        res.clearCookie('refreshToken', { httpOnly: true, maxAge: 0 })
         res.sendStatus(204)
     } catch (err) {
         next(err)
@@ -189,7 +188,7 @@ export const refresh = async (req, res, next) => {
                 { expiresIn: process.env.JWT_ACCESS_TOKEN_EXPIRE }
             )
 
-            res.status(201).json({ accessToken })
+            res.status(201).json({ user, accessToken })
         })
     } catch (err) {
         next(err)

@@ -35,7 +35,7 @@ export const getAllTeams = async (req, res, next) => {
 
 export const createTeam = async (req, res, next) => {
     try {
-        const { users } = req.body
+        const users = !req.body.users ? undefined : Array.isArray(req.body.users) ? req.body.users : [req.body.users]
 
         if (users) {
             const usersIdIsValid = users.map((userId) => {
